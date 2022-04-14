@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "solhint": "^3.3.7"
+  }
+}

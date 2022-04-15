@@ -1,63 +1,115 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-
-error NotOwner();
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {IAssetVault} from "./IAssetVault.sol";
 
 /// @author Philippe Dumonet
-contract AssetVault is Context, Multicall, Initializable {
+contract AssetVault is Context, Multicall, Initializable, IAssetVault {
+    using SafeERC20 for IERC20;
+
     // slot n+0
-    address internal owner;
-    uint64 internal lastPing;
-    uint32 internal guardianCount;
+    address public owner;
+    uint64 public lastPing;
 
-    // guardians stored in manually managed dynamic array for efficiency
-    // keccak256("philogy.Social-Recovery-Asset-Vault.guardian-array")
-    bytes32 internal constant GUARDIANS_START_SLOT =
-        0x1948fdddb92e5a760b9e1d3ffc98707129333bbdc4313bac31e63d1502cc3f9e;
+    bytes32 public guardiansMerkleRoot;
 
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    struct CustomCall {
-        bool requireSuccess;
-        address target;
-        uint256 value;
-        bytes callData;
+    modifier onlyOwner() {
+        _checkOwnerCalling();
+        _;
     }
 
-    receive() external payable {}
-
-    function initialize(address _firstOwner, uint256[] memory _packedGuardians)
-        external
-        initializer
-    {
-        owner = _firstOwner;
-        lastPing = uint64(block.timestamp);
-        guardianCount = uint32(_packedGuardians.length);
+    receive() external payable {
+        if (_msgSender() == owner) _ping();
     }
 
-    function ping() external {
-        _checkOnlyOwner();
-        lastPing = uint64(block.timestamp);
+    function initialize(address _firstOwner, bytes32 _guardiansMerkleRoot) external initializer {
+        _ping();
+        _setGuardiansMerkleRoot(_guardiansMerkleRoot);
+        _transferOwner(address(0), _firstOwner);
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function ping() external onlyOwner {}
+
+    function recoverAsGuardianTo(
+        address _newOwner,
+        uint256 _delay,
+        bytes32[] memory _proof
+    ) external {
+        // read slot together
+        address previousOwner = owner;
+        uint256 lastStoredPing = lastPing;
+        if (lastStoredPing + _delay > block.timestamp) revert DelayNotPassed();
+        // equivalent to bytes32 leaf = keccak256(abi.encode(_msgSender(), _delay));
+        bytes32 leaf;
+        address guardian = _msgSender();
+        assembly {
+            mstore(0x00, guardian)
+            mstore(0x20, _delay)
+            leaf := keccak256(0x00, 0x40)
+        }
+        if (!MerkleProof.verify(_proof, guardiansMerkleRoot, leaf)) revert InvalidMerkleProof();
+        _ping();
+        _transferOwner(previousOwner, _newOwner);
+        _setGuardiansMerkleRoot(bytes32(uint256(1)));
+        emit GuardianRecovered(guardian, _newOwner, _delay);
     }
 
     function transferOwnership(address _newOwner) external {
-        (address previousOwner, ) = _checkOnlyOwner();
-        owner = _newOwner;
-        lastPing = uint64(block.timestamp);
-        emit OwnershipTransferred(previousOwner, _newOwner);
+        address previousOwner = _checkOwnerCalling();
+        _transferOwner(previousOwner, _newOwner);
     }
 
-    function doCalls(CustomCall[] calldata _calls) external {
-        _checkOnlyOwner();
+    function updateGuardianMerkle(bytes32 _newGuardiansMerkleRoot) external onlyOwner {
+        _setGuardiansMerkleRoot(_newGuardiansMerkleRoot);
+    }
+
+    function transferNative(address payable _recipient, uint256 _value) external onlyOwner {
+        Address.sendValue(_recipient, _value);
+    }
+
+    function transferToken(
+        IERC20 _token,
+        address _from,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner {
+        _token.safeTransferFrom(_from, _to, _amount);
+    }
+
+    function transferNFT(
+        IERC721 _token,
+        address _from,
+        address _to,
+        uint256 _tokenId
+    ) external onlyOwner {
+        _token.safeTransferFrom(_from, _to, _tokenId);
+    }
+
+    function transferCollectible(
+        IERC1155 _collectible,
+        address _from,
+        address _to,
+        uint256 _tokenId,
+        uint256 _amount
+    ) external onlyOwner {
+        _collectible.safeTransferFrom(_from, _to, _tokenId, _amount, "");
+    }
+
+    function doCustomCalls(CustomCall[] calldata _calls) external onlyOwner {
         uint256 callLen = _calls.length;
         for (uint256 i = 0; i < callLen; ) {
             (bool success, bytes memory returndata) = _calls[i].target.call{value: _calls[i].value}(
-                _calls[i].callData
+                _calls[i].data
             );
             Address.verifyCallResult(
                 success || !_calls[i].requireSuccess,
@@ -70,10 +122,26 @@ contract AssetVault is Context, Multicall, Initializable {
         }
     }
 
-    function _checkOnlyOwner() internal view returns (address, uint256) {
+    function _checkOwnerCalling() internal returns (address) {
+        _ping();
         address currentOwner = owner;
-        uint256 currentGuardianCount = guardianCount;
         if (_msgSender() != currentOwner) revert NotOwner();
-        return (currentOwner, currentGuardianCount);
+        return currentOwner;
+    }
+
+    function _ping() internal {
+        lastPing = uint64(block.timestamp);
+        emit Ping();
+    }
+
+    function _transferOwner(address _previousOwner, address _newOwner) internal {
+        if (_newOwner == address(0)) revert NewOwnerZeroAddress();
+        owner = _newOwner;
+        emit OwnershipTransferred(_previousOwner, _newOwner);
+    }
+
+    function _setGuardiansMerkleRoot(bytes32 _newGuardiansMerkleRoot) internal {
+        guardiansMerkleRoot = _newGuardiansMerkleRoot;
+        emit GuardiansUpdate(_newGuardiansMerkleRoot);
     }
 }

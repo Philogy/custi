@@ -53,7 +53,6 @@ contract AssetVault is Context, Multicall, Initializable, IAssetVault {
         if (!isGuardian(guardian, _delay, _proof)) revert InvalidMerkleProof();
         _ping();
         _transferOwner(previousOwner, _newOwner);
-        _setGuardiansMerkleRoot(bytes32(uint256(1)));
         emit GuardianRecovered(guardian, _newOwner, _delay);
     }
 

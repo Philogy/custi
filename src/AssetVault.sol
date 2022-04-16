@@ -49,15 +49,8 @@ contract AssetVault is Context, Multicall, Initializable, IAssetVault {
         address previousOwner = owner;
         uint256 lastStoredPing = lastPing;
         if (lastStoredPing + _delay > block.timestamp) revert DelayNotPassed();
-        // equivalent to bytes32 leaf = keccak256(abi.encode(_msgSender(), _delay));
-        bytes32 leaf;
         address guardian = _msgSender();
-        assembly {
-            mstore(0x00, guardian)
-            mstore(0x20, _delay)
-            leaf := keccak256(0x00, 0x40)
-        }
-        if (!MerkleProof.verify(_proof, guardiansMerkleRoot, leaf)) revert InvalidMerkleProof();
+        if (!isGuardian(guardian, _delay, _proof)) revert InvalidMerkleProof();
         _ping();
         _transferOwner(previousOwner, _newOwner);
         _setGuardiansMerkleRoot(bytes32(uint256(1)));
@@ -120,6 +113,24 @@ contract AssetVault is Context, Multicall, Initializable, IAssetVault {
                 i++;
             }
         }
+    }
+
+    function guardianLeaf(address _guardian, uint256 _delay) public pure returns (bytes32 leaf) {
+        // equivalent to leaf = keccak256(abi.encode(_guardian, _delay));
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0x00, _guardian)
+            mstore(0x20, _delay)
+            leaf := keccak256(0x00, 0x40)
+        }
+    }
+
+    function isGuardian(
+        address _guardian,
+        uint256 _delay,
+        bytes32[] memory _proof
+    ) public view returns (bool) {
+        return MerkleProof.verify(_proof, guardiansMerkleRoot, guardianLeaf(_guardian, _delay));
     }
 
     function _checkOwnerCalling() internal returns (address) {

@@ -68,4 +68,12 @@ interface IAssetVault {
     function lastPing() external view returns (uint64);
 
     function guardiansMerkleRoot() external view returns (bytes32);
+
+    function guardianLeaf(address _guardian, uint256 _delay) external pure returns (bytes32);
+
+    function isGuardian(
+        address _guardian,
+        uint256 _delay,
+        bytes32[] memory _proof
+    ) external view returns (bool);
 }

@@ -6,5 +6,10 @@ import {CheatCodes} from "./CheatCodes.sol";
 
 /// @author Philippe Dumonet
 contract BaseTest is DSTest {
-    CheatCodes private hevm = CheatCodes(HEVM_ADDRESS);
+    CheatCodes internal cheats = CheatCodes(HEVM_ADDRESS);
+
+    function _advanceTime(uint256 _increase) internal returns (uint256 newTime) {
+        newTime = block.timestamp + _increase;
+        cheats.warp(newTime);
+    }
 }

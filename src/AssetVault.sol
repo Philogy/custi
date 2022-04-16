@@ -22,6 +22,7 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
     address public owner;
     uint64 public lastPing;
 
+    // slot n+1
     bytes32 public guardiansMerkleRoot;
 
     modifier onlyOwner() {
@@ -50,6 +51,7 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         // read slot together
         address previousOwner = owner;
         uint256 lastStoredPing = lastPing;
+        // solhint-disable-next-line not-rely-on-time
         if (lastStoredPing + _delay > block.timestamp) revert DelayNotPassed();
         address guardian = _msgSender();
         if (!isGuardian(guardian, _delay, _proof)) revert InvalidMerkleProof();
@@ -107,21 +109,19 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         _collectible.safeTransferFrom(_from, _to, _tokenId, _amount, "");
     }
 
-    function doCustomCalls(CustomCall[] calldata _calls) external onlyOwner {
-        uint256 callLen = _calls.length;
-        for (uint256 i = 0; i < callLen; ) {
-            (bool success, bytes memory returndata) = _calls[i].target.call{value: _calls[i].value}(
-                _calls[i].data
-            );
-            Address.verifyCallResult(
-                success || !_calls[i].requireSuccess,
-                returndata,
-                "AssetVault: Required call revert"
-            );
-            unchecked {
-                i++;
-            }
-        }
+    function doCustomCall(
+        address _target,
+        uint256 _value,
+        bytes calldata _calldata,
+        bool _requireSuccess
+    ) external onlyOwner {
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = _target.call{value: _value}(_calldata);
+        Address.verifyCallResult(
+            success || !_requireSuccess,
+            returndata,
+            "AssetVault: Call reverted"
+        );
     }
 
     function guardianLeaf(address _guardian, uint256 _delay) public pure returns (bytes32 leaf) {
@@ -150,6 +150,7 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
     }
 
     function _ping() internal {
+        // solhint-disable-next-line not-rely-on-time
         lastPing = uint64(block.timestamp);
         emit Ping();
     }

@@ -69,7 +69,12 @@ interface IAssetVault is IERC721Receiver, IERC1155Receiver {
         bytes data;
     }
 
-    function doCustomCalls(CustomCall[] calldata _calls) external;
+    function doCustomCall(
+        address _target,
+        uint256 _value,
+        bytes calldata _calldata,
+        bool _requireSuccess
+    ) external;
 
     function owner() external view returns (address);
 

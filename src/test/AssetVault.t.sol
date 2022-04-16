@@ -136,4 +136,26 @@ contract AssetVaultTest is BaseTest {
         cheats.prank(ATTACKER1);
         vault.updateGuardianMerkle(attackLeaf);
     }
+
+    function testOwnerCanTransferOwnership() public {
+        uint256 newTime = _advanceTime(2 days);
+
+        cheats.expectEmit(false, false, false, false);
+        emit Ping();
+
+        cheats.expectEmit(true, true, false, false);
+        emit OwnershipTransferred(USER1, USER2);
+
+        cheats.prank(USER1);
+        vault.transferOwnership(USER2);
+
+        assertEq(vault.owner(), USER2);
+        assertEq(vault.lastPing(), newTime);
+    }
+
+    function testPreventNotOwnerTransferringOwnership() public {
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+        cheats.prank(ATTACKER1);
+        vault.transferOwnership(ATTACKER1);
+    }
 }

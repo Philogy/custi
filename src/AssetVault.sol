@@ -4,7 +4,9 @@ pragma solidity 0.8.13;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
@@ -13,7 +15,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {IAssetVault} from "./IAssetVault.sol";
 
 /// @author Philippe Dumonet
-contract AssetVault is Context, Multicall, Initializable, IAssetVault {
+contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155Holder, IAssetVault {
     using SafeERC20 for IERC20;
 
     // slot n+0
@@ -70,6 +72,14 @@ contract AssetVault is Context, Multicall, Initializable, IAssetVault {
     }
 
     function transferToken(
+        IERC20 _token,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner {
+        _token.safeTransfer(_to, _amount);
+    }
+
+    function transferTokenFrom(
         IERC20 _token,
         address _from,
         address _to,

@@ -3,9 +3,11 @@ pragma solidity 0.8.13;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
-interface IAssetVault {
+interface IAssetVault is IERC721Receiver, IERC1155Receiver {
     error NotOwner();
     error NewOwnerZeroAddress();
     error DelayNotPassed();
@@ -33,6 +35,12 @@ interface IAssetVault {
     function transferNative(address payable _recipient, uint256 _value) external;
 
     function transferToken(
+        IERC20 _token,
+        address _to,
+        uint256 _amount
+    ) external;
+
+    function transferTokenFrom(
         IERC20 _token,
         address _from,
         address _to,

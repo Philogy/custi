@@ -130,6 +130,41 @@ contract AssetVaultTest is BaseTest {
     }
 
     // -- Test General Admin Methods --
+    function testOwnerMulticall() public {
+        uint256 newTime = _advanceTime(365 days);
+
+        MockERC20 token = new MockERC20();
+        token.mint(address(vault), 1000 * 1e18);
+
+        bytes[] memory calls = new bytes[](3);
+        calls[0] = abi.encodeCall(vault.transferToken, (token, USER1, 700 * 1e18));
+        calls[1] = abi.encodeCall(vault.transferToken, (token, USER2, 200 * 1e18));
+        calls[2] = abi.encodeCall(vault.transferToken, (token, USER3, 100 * 1e18));
+
+        cheats.expectEmit(false, false, false, false);
+        emit Ping();
+
+        cheats.prank(USER1);
+        vault.multicall(calls);
+
+        assertEq(token.balanceOf(USER1), 700 * 1e18);
+        assertEq(token.balanceOf(USER2), 200 * 1e18);
+        assertEq(token.balanceOf(USER3), 100 * 1e18);
+
+        assertEq(vault.lastPing(), newTime);
+    }
+
+    // sanity check
+    function testPreventCircumventOwnerMulticall() public {
+        MockERC20 token = new MockERC20();
+        token.mint(address(vault), 1000 * 1e18);
+
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+        bytes[] memory calls = new bytes[](1);
+        calls[0] = abi.encodeCall(vault.transferToken, (token, ATTACKER1, 1000 * 1e18));
+        cheats.prank(ATTACKER1);
+        vault.multicall(calls);
+    }
 
     function testOwnerPing() public {
         uint256 newTime = _advanceTime(2 days);

@@ -20,21 +20,17 @@ contract AssetVaultFactory is Context {
         vaultImplementation = address(new AssetVault());
     }
 
+    function createNewVault(bytes32 _guardiansMerkleRoot) external returns (address) {
+        return createNewVaultFor(_msgSender(), _guardiansMerkleRoot);
+    }
+
     function createNewVaultFor(address _initialOwner, bytes32 _guardiansMerkleRoot)
-        external
+        public
         returns (address)
     {
         IAssetVault newVault = IAssetVault(Clones.clone(vaultImplementation));
         newVault.initialize(_initialOwner, _guardiansMerkleRoot);
         emit NewVaultCreated(address(newVault), _initialOwner, _guardiansMerkleRoot);
-        return address(newVault);
-    }
-
-    function createNewVault(bytes32 _guardiansMerkleRoot) external returns (address) {
-        IAssetVault newVault = IAssetVault(Clones.clone(vaultImplementation));
-        address creator = _msgSender();
-        newVault.initialize(creator, _guardiansMerkleRoot);
-        emit NewVaultCreated(address(newVault), creator, _guardiansMerkleRoot);
         return address(newVault);
     }
 }

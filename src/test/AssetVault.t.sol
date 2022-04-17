@@ -5,6 +5,7 @@ import {BaseTest} from "../utils/BaseTest.sol";
 import {AssetVault} from "../AssetVault.sol";
 import {IAssetVault} from "../IAssetVault.sol";
 import {MerkleProofBuilder} from "../utils/MerkleProofBuilder.sol";
+import {MockERC20} from "../mock/MockERC20.sol";
 import {MockERC721} from "../mock/MockERC721.sol";
 import {MockERC1155} from "../mock/MockERC1155.sol";
 
@@ -14,24 +15,25 @@ contract AssetVaultTest is BaseTest {
 
     address private constant USER1 = address(1);
     address private constant USER2 = address(2);
+    address private constant USER3 = address(3);
 
-    address private constant GUARDIAN1 = address(3);
+    address private constant GUARDIAN1 = address(4);
     uint256 private delay1 = 3 days;
     bytes32 private node1;
 
-    address private constant GUARDIAN2 = address(4);
+    address private constant GUARDIAN2 = address(5);
     uint256 private delay2 = 30 days;
     bytes32 private node2;
 
     bytes32 private node12;
 
-    address private constant GUARDIAN3 = address(5);
+    address private constant GUARDIAN3 = address(6);
     uint256 private delay3 = 365 days;
     bytes32 private node3;
 
     bytes32 private root;
 
-    address private constant ATTACKER1 = address(6);
+    address private constant ATTACKER1 = address(7);
 
     AssetVault private vault;
 
@@ -270,6 +272,89 @@ contract AssetVaultTest is BaseTest {
         cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
         cheats.prank(ATTACKER1);
         vault.transferNative(payable(ATTACKER1), 1 wei);
+    }
+
+    function testOwnerTransferDirectERC20() public {
+        uint256 newTime = _advanceTime(4 days);
+
+        MockERC20 token = new MockERC20();
+
+        token.mint(address(vault), 10 * 1e18);
+        assertEq(token.balanceOf(address(vault)), 10 * 1e18);
+
+        cheats.expectEmit(false, false, false, false);
+        emit Ping();
+
+        cheats.prank(USER1);
+        vault.transferToken(token, USER2, 3 * 1e18);
+
+        assertEq(token.balanceOf(address(vault)), 7 * 1e18);
+        assertEq(token.balanceOf(USER2), 3 * 1e18);
+
+        assertEq(vault.lastPing(), newTime);
+    }
+
+    function testPreventNotOwnerTransferDirectERC20() public {
+        MockERC20 token = new MockERC20();
+        token.mint(address(vault), 10 * 1e18);
+
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+
+        cheats.prank(ATTACKER1);
+        vault.transferToken(token, ATTACKER1, 10 * 1e18);
+    }
+
+    function testOwnerTransferFromERC20() public {
+        uint256 newTime = _advanceTime(4 days);
+
+        MockERC20 token = new MockERC20();
+
+        token.mint(USER2, 10 * 1e18);
+        cheats.prank(USER2);
+        token.approve(address(vault), type(uint256).max);
+
+        cheats.expectEmit(false, false, false, false);
+        emit Ping();
+
+        cheats.prank(USER1);
+        vault.transferTokenFrom(token, USER2, USER3, 3 * 1e18);
+
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(token.balanceOf(USER1), 0);
+        assertEq(token.balanceOf(USER2), 7 * 1e18);
+        assertEq(token.balanceOf(USER3), 3 * 1e18);
+
+        assertEq(vault.lastPing(), newTime);
+    }
+
+    function testPreventNotOwnerTransferFromERC20() public {
+        MockERC20 token = new MockERC20();
+
+        token.mint(USER2, 10 * 1e18);
+        cheats.prank(USER2);
+        token.approve(address(vault), type(uint256).max);
+
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+        cheats.prank(ATTACKER1);
+        vault.transferTokenFrom(token, USER2, ATTACKER1, 10 * 1e18);
+    }
+
+    function testOwnerTransferERC721() public {
+        MockERC721 token = new MockERC721();
+        token.mint(address(vault), 21);
+        assertEq(token.ownerOf(21), address(vault));
+        cheats.prank(USER1);
+        vault.transferNFT(token, address(vault), USER2, 21);
+        assertEq(token.ownerOf(21), USER2);
+    }
+
+    function testPreventNotOwnerTransferERC721() public {
+        MockERC721 token = new MockERC721();
+        token.mint(address(vault), 21);
+
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+        cheats.prank(ATTACKER1);
+        vault.transferNFT(token, address(vault), ATTACKER1, 21);
     }
 
     // -- Test Recovery --

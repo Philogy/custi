@@ -310,6 +310,17 @@ contract AssetVaultTest is BaseTest {
         assertEq(address(vault).balance, bal - transfer);
     }
 
+    function testOwnerTransferMaxETH() public {
+        uint256 totalBal = 6.23 ether;
+        cheats.deal(address(vault), totalBal);
+
+        cheats.prank(USER1);
+        vault.transferNative(payable(USER3), 0);
+
+        assertEq(address(vault).balance, 0);
+        assertEq(USER3.balance, totalBal);
+    }
+
     function testPreventNotOwnerTransferETH() public {
         cheats.deal(address(vault), 10 ether);
 
@@ -336,6 +347,19 @@ contract AssetVaultTest is BaseTest {
         assertEq(token.balanceOf(USER2), 3 * 1e18);
 
         assertEq(vault.lastPing(), newTime);
+    }
+
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+
+    function testTransferMaxERC20() public {
+        MockERC20 token = new MockERC20();
+        token.mint(address(vault), 1798.872 * 1e18);
+
+        cheats.prank(USER1);
+        vault.transferToken(token, USER2, 0);
+
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(token.balanceOf(USER2), 1798.872 * 1e18);
     }
 
     function testPreventNotOwnerTransferDirectERC20() public {
@@ -369,6 +393,43 @@ contract AssetVaultTest is BaseTest {
         assertEq(token.balanceOf(USER3), 3 * 1e18);
 
         assertEq(vault.lastPing(), newTime);
+    }
+
+    function testTransferFromMaxERC20() public {
+        MockERC20 token = new MockERC20();
+        token.mint(USER2, 10000 * 1e18);
+
+        // transfer balance > allowance
+        cheats.prank(USER2);
+        token.approve(address(vault), 7300 * 1e18);
+        assertEq(token.allowance(USER2, address(vault)), 7300 * 1e18);
+
+        cheats.expectEmit(true, true, false, true);
+        emit Transfer(USER2, USER3, 7300 * 1e18);
+
+        cheats.prank(USER1);
+        vault.transferTokenFrom(token, USER2, USER3, 0);
+
+        assertEq(token.balanceOf(address(vault)), 0);
+        assertEq(token.balanceOf(USER1), 0);
+        assertEq(token.balanceOf(USER2), 2700 * 1e18);
+        assertEq(token.balanceOf(USER3), 7300 * 1e18);
+        assertEq(token.allowance(USER2, address(vault)), 0);
+
+        // transfer balance < allowance
+        cheats.prank(USER2);
+        token.approve(address(vault), 4000 * 1e18);
+
+        cheats.expectEmit(true, true, false, true);
+        emit Transfer(USER2, address(vault), 2700 * 1e18);
+
+        cheats.prank(USER1);
+        vault.transferTokenFrom(token, USER2, address(vault), 0);
+
+        assertEq(token.balanceOf(address(vault)), 2700 * 1e18);
+        assertEq(token.balanceOf(USER2), 0);
+        assertEq(token.balanceOf(USER3), 7300 * 1e18);
+        assertEq(token.allowance(USER2, address(vault)), 1300 * 1e18);
     }
 
     function testPreventNotOwnerTransferFromERC20() public {

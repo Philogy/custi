@@ -8,6 +8,7 @@ import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Hol
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -74,6 +75,10 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
     // -- Asset Managing Methods --
 
     function transferNative(address payable _recipient, uint256 _value) external onlyOwner {
+        if (_value == 0) {
+            _value = address(this).balance;
+            if (_value == 0) return;
+        }
         Address.sendValue(_recipient, _value);
     }
 
@@ -82,6 +87,10 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         address _to,
         uint256 _amount
     ) external onlyOwner {
+        if (_amount == 0) {
+            _amount = _token.balanceOf(address(this));
+            if (_amount == 0) return;
+        }
         _token.safeTransfer(_to, _amount);
     }
 
@@ -91,6 +100,10 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         address _to,
         uint256 _amount
     ) external onlyOwner {
+        if (_amount == 0) {
+            _amount = Math.min(_token.balanceOf(_from), _token.allowance(_from, address(this)));
+            if (_amount == 0) return;
+        }
         _token.safeTransferFrom(_from, _to, _amount);
     }
 

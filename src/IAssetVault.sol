@@ -79,7 +79,7 @@ interface IAssetVault is IERC721Receiver, IERC1155Receiver {
         uint256 _value,
         bytes calldata _calldata,
         bool _requireSuccess
-    ) external;
+    ) external returns (bool, bytes memory);
 
     function owner() external view returns (address);
 

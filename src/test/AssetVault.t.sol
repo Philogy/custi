@@ -8,6 +8,7 @@ import {MerkleProofBuilder} from "../utils/MerkleProofBuilder.sol";
 import {MockERC20} from "../mock/MockERC20.sol";
 import {MockERC721} from "../mock/MockERC721.sol";
 import {MockERC1155} from "../mock/MockERC1155.sol";
+import {MockContract} from "../mock/MockContract.sol";
 
 /// @author Philippe Dumonet
 contract AssetVaultTest is BaseTest {
@@ -38,9 +39,18 @@ contract AssetVaultTest is BaseTest {
     AssetVault private vault;
 
     function setUp() public {
+        cheats.label(USER1, "user 1");
+        cheats.label(USER2, "user 2");
+        cheats.label(USER3, "user 3");
+        cheats.label(GUARDIAN1, "user 1");
+        cheats.label(GUARDIAN2, "user 2");
+        cheats.label(GUARDIAN3, "user 3");
+        cheats.label(ATTACKER1, "attacker");
+
         cheats.warp(START_TIME);
 
         vault = new AssetVault();
+        cheats.label(address(vault), "vault");
 
         node1 = vault.guardianLeaf(GUARDIAN1, delay1);
         node2 = vault.guardianLeaf(GUARDIAN2, delay2);
@@ -190,14 +200,13 @@ contract AssetVaultTest is BaseTest {
     // -- Test Asset Acceptance --
 
     function testAcceptsETH() public {
-        uint256 lastPingBefore = vault.lastPing();
         uint256 newTime = _advanceTime(2 days);
         cheats.deal(USER2, 8 ether);
-        (bool success, ) = _transferNative(USER2, address(vault), 8 ether);
+        cheats.prank(USER2);
+        bool success = payable(address(vault)).send(8 ether);
         assertTrue(success);
         assertEq(address(vault).balance, 8 ether);
         // ensure that ping not triggered
-        assertEq(vault.lastPing(), lastPingBefore);
         assertTrue(vault.lastPing() != newTime);
     }
 
@@ -339,6 +348,9 @@ contract AssetVaultTest is BaseTest {
         vault.transferTokenFrom(token, USER2, ATTACKER1, 10 * 1e18);
     }
 
+    // ping no longer tested beyond here as `onlyOwner` is always used and
+    // implicitly tested via the `testPrevent<X>` tests
+
     function testOwnerTransferERC721() public {
         MockERC721 token = new MockERC721();
         token.mint(address(vault), 21);
@@ -355,6 +367,99 @@ contract AssetVaultTest is BaseTest {
         cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
         cheats.prank(ATTACKER1);
         vault.transferNFT(token, address(vault), ATTACKER1, 21);
+    }
+
+    function testOwnerTransferERC1155() public {
+        MockERC1155 token = new MockERC1155();
+        token.mint(address(vault), 420, 69);
+        assertEq(token.balanceOf(address(vault), 420), 69);
+        cheats.prank(USER1);
+        vault.transferCollectible(token, address(vault), USER2, 420, 21);
+        assertEq(token.balanceOf(address(vault), 420), 69 - 21);
+        assertEq(token.balanceOf(USER2, 420), 21);
+    }
+
+    function testPreventNotOwnerTransferERC1155() public {
+        MockERC1155 token = new MockERC1155();
+        token.mint(address(vault), 420, 69);
+
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+        cheats.prank(ATTACKER1);
+        vault.transferCollectible(token, address(vault), ATTACKER1, 420, 69);
+    }
+
+    // -- Test Custom Calls --
+
+    function testPreventNotOwnerCustomCall() public {
+        MockContract c = new MockContract();
+
+        cheats.expectRevert(abi.encodeWithSelector(IAssetVault.NotOwner.selector));
+        cheats.prank(ATTACKER1);
+        vault.doCustomCall(address(c), 0, abi.encodeCall(c.setValue, 1 ether), true);
+    }
+
+    function testOwnerCustomCall() public {
+        MockContract c = new MockContract();
+        cheats.label(address(c), "mock contract");
+        cheats.deal(address(vault), 10 ether);
+        assertEq(c.value(), 0);
+        assertEq(c.lastSender(), address(0));
+
+        // basic call
+        uint256 value = 1 ether;
+        cheats.prank(USER1);
+        (bool success, bytes memory returndata) = vault.doCustomCall(
+            address(c),
+            0,
+            abi.encodeCall(c.setValue, value),
+            true
+        );
+        assertTrue(success);
+        assertEq(keccak256(returndata), keccak256(""));
+        assertEq(address(vault).balance, 10 ether);
+        assertEq(address(c).balance, 0);
+        assertEq(c.value(), value);
+        assertEq(c.lastSender(), address(vault));
+
+        c.reset();
+
+        // call with ETH / EVM native coin
+        cheats.prank(USER1);
+        (success, returndata) = vault.doCustomCall(
+            address(c),
+            value,
+            abi.encodeCall(c.payIn, ()),
+            true
+        );
+        assertTrue(success);
+        assertEq(keccak256(returndata), keccak256(abi.encode(keccak256(abi.encode(address(c))))));
+        assertEq(address(vault).balance, 10 ether - value);
+        assertEq(address(c).balance, value);
+        assertEq(c.lastSender(), address(vault));
+
+        // call bubbles revert
+        cheats.expectRevert("MockContract: Incorrect Value");
+        cheats.prank(USER1);
+        (success, returndata) = vault.doCustomCall(
+            address(c),
+            value - 1,
+            abi.encodeCall(c.payIn, ()),
+            true
+        );
+
+        // call does not bubble revert if success not required
+        cheats.prank(USER1);
+        (success, returndata) = vault.doCustomCall(
+            address(c),
+            value - 1,
+            abi.encodeCall(c.payIn, ()),
+            false
+        );
+        assertTrue(!success);
+        assertEq(
+            keccak256(returndata),
+            keccak256(abi.encodeWithSignature("Error(string)", "MockContract: Incorrect Value"))
+        );
     }
 
     // -- Test Recovery --

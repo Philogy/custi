@@ -118,9 +118,9 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         uint256 _value,
         bytes calldata _calldata,
         bool _requireSuccess
-    ) external onlyOwner {
+    ) external onlyOwner returns (bool success, bytes memory returndata) {
         // solhint-disable-next-line avoid-low-level-calls
-        (bool success, bytes memory returndata) = _target.call{value: _value}(_calldata);
+        (success, returndata) = _target.call{value: _value}(_calldata);
         Address.verifyCallResult(
             success || !_requireSuccess,
             returndata,

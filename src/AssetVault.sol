@@ -40,9 +40,6 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         _transferOwner(address(0), _firstOwner);
     }
 
-    // solhint-disable-next-line no-empty-blocks
-    function ping() external onlyOwner {}
-
     function recoverAsGuardianTo(
         address _newOwner,
         uint256 _delay,
@@ -57,8 +54,13 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
         if (!isGuardian(guardian, _delay, _proof)) revert InvalidMerkleProof();
         _ping();
         _transferOwner(previousOwner, _newOwner);
-        emit GuardianRecovered(guardian, _newOwner, _delay);
+        emit GuardianRecovered(guardian, _newOwner, _delay, _proof);
     }
+
+    // -- General Admin Methods --
+
+    // solhint-disable-next-line no-empty-blocks
+    function ping() external onlyOwner {}
 
     function transferOwnership(address _newOwner) external {
         address previousOwner = _checkOwnerCalling();
@@ -68,6 +70,8 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
     function updateGuardianMerkle(bytes32 _newGuardiansMerkleRoot) external onlyOwner {
         _setGuardiansMerkleRoot(_newGuardiansMerkleRoot);
     }
+
+    // -- Asset Managing Methods --
 
     function transferNative(address payable _recipient, uint256 _value) external onlyOwner {
         Address.sendValue(_recipient, _value);
@@ -123,6 +127,8 @@ contract AssetVault is Context, Multicall, Initializable, ERC721Holder, ERC1155H
             "AssetVault: Call reverted"
         );
     }
+
+    // -- Guardian Merkle Proof View Methods --
 
     function guardianLeaf(address _guardian, uint256 _delay) public pure returns (bytes32 leaf) {
         // equivalent to leaf = keccak256(abi.encode(_guardian, _delay));

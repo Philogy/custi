@@ -16,7 +16,12 @@ interface IAssetVault is IERC721Receiver, IERC1155Receiver {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event GuardiansUpdate(bytes32 indexed newMerkleRoot);
     event Ping();
-    event GuardianRecovered(address indexed guardian, address indexed newOwner, uint256 delay);
+    event GuardianRecovered(
+        address indexed guardian,
+        address indexed newOwner,
+        uint256 delay,
+        bytes32[] proof
+    );
 
     function initialize(address _firstOwner, bytes32 _guardiansMerkleRoot) external;
 

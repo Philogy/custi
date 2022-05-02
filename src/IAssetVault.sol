@@ -67,13 +67,6 @@ interface IAssetVault is IERC721Receiver, IERC1155Receiver {
         uint256 _amount
     ) external;
 
-    struct CustomCall {
-        bool requireSuccess;
-        address target;
-        uint256 value;
-        bytes data;
-    }
-
     function doCustomCall(
         address _target,
         uint256 _value,

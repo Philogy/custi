@@ -9,7 +9,7 @@ of your choosing should you pass away.
 
 Furthermore the vault should allow you to protect yourself from "5$ wrench
 attacks" in certain scenarios. A "5$ wrench attack" is an attack whereby assets
-are extorted from a victim threat of physical violence.
+are extorted from a victim using the threat of physical violence.
 
 
 ## Progress V1 🚧

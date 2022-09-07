@@ -12,7 +12,7 @@ attacks" in certain scenarios. A "5$ wrench attack" is an attack whereby assets
 are extorted from a victim threat of physical violence.
 
 
-## Progress V1
+## Progress V1 🚧
 
 - [ ] Basic custody: Owner should be able to deposit / withdraw assets from
   their vault

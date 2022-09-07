@@ -70,7 +70,7 @@ interface IAssetVault is IERC721Receiver, IERC1155Receiver {
     function doCustomCall(
         address _target,
         uint256 _value,
-        bytes calldata _calldata,
+        bytes memory _calldata,
         bool _requireSuccess
     ) external returns (bool, bytes memory);
 

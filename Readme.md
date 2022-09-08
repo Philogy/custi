@@ -16,9 +16,9 @@ are extorted from a victim using the threat of physical violence.
 
 - [ ] Basic custody: Owner should be able to deposit / withdraw assets from
   their vault
-- [ ] Pinging: Vault should keep track of last interaction from owner,
+- [x] Pinging: Vault should keep track of last interaction from owner,
   prerequisite for recovery
-- [ ] Locking: Owner should be able to lock themselves out of their vault for a
+- [x] Locking: Owner should be able to lock themselves out of their vault for a
   set period of time
 - [ ] Multi-Sig Recovery Agents: Allow easy configuration of recovery options
   that require multiple signatures

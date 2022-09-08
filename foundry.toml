@@ -4,7 +4,6 @@ out = 'out'
 libs = ['lib']
 optimizer = true
 optimizer_runs = 10000
-solc_version = '0.8.13'
 
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config

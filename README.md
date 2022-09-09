@@ -15,7 +15,7 @@ are extorted from a victim using the threat of physical violence.
 ## Custi V1
 ### V1 Progress 🚧
 
-- [ ] Basic custody: Owner should be able to deposit / withdraw assets from
+- [x] Basic custody: Owner should be able to deposit / withdraw assets from
   their vault
 - [x] Pinging: Vault should keep track of last interaction from owner,
   prerequisite for recovery

@@ -44,16 +44,11 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
     function ping() external payable onlyOwner {}
 
     function lockTill(uint256 _timestamp) external {
-        uint256 slot0_ = slot0;
-        _checkOwner(slot0_);
-        slot0 = _setLockTill(slot0_, _timestamp);
+        _lockTill(_timestamp);
     }
 
     function lockFor(uint256 _lockDuration) external {
-        uint256 slot0_ = slot0;
-        _checkOwner(slot0_);
-        // solhint-disable-next-line not-rely-on-time
-        slot0 = _setLockTill(slot0_, block.timestamp + _lockDuration);
+        _lockTill(block.timestamp + _lockDuration);
     }
 
     function transferOwnership(address _newOwner) external {
@@ -197,22 +192,21 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         if (address(uint160(_slot0)) != msg.sender) revert NotOwner();
     }
 
-    function _setLockTill(uint256 _slot0, uint256 _timestamp)
-        internal
-        returns (uint256 updatedSlot0)
-    {
-        uint256 currentLock = _slot0 >> LOCKED_TILL_OFFSET;
+    function _lockTill(uint256 _timestamp) internal {
+        uint256 slot0_ = slot0;
+        _checkOwner(slot0_);
+        uint256 currentLock = slot0_ >> LOCKED_TILL_OFFSET;
         if (_timestamp <= currentLock) revert InvalidLockTime();
         emit Locked(_timestamp);
         // solhint-disable-next-line not-rely-on-time
         if (currentLock > block.timestamp) {
             // Vault still locked, no ping
-            return (_slot0 & OWNER_PING_MASK) | (_timestamp << LOCKED_TILL_OFFSET);
+            slot0 = (slot0_ & OWNER_PING_MASK) | (_timestamp << LOCKED_TILL_OFFSET);
         } else {
             // Vault was already unlocked, _ping not used here due to gas
             emit Ping();
-            return
-                (_slot0 & OWNER_MASK) |
+            slot0 =
+                (slot0_ & OWNER_MASK) |
                 // solhint-disable-next-line not-rely-on-time
                 (block.timestamp << PING_OFFSET) |
                 (_timestamp << LOCKED_TILL_OFFSET);

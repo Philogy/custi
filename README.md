@@ -30,7 +30,7 @@ are extorted from a victim using the threat of physical violence.
 1. Only the owner can directly access custody methods if the vault is not locked (`transfer{...}`, `customCall`)
 2. Only the owner can directly lock the vault till a specific block timestamp is
    reached
-3. The owner can only ping the vault while not locked
+3. The owner can only ping the vault while it's not locked
 4. An account is a guardian if contained in the guardian merkle tree along with
    a delay
 5. A guardian may only change the owner of a vault if their associated delay

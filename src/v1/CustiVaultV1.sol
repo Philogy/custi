@@ -1,10 +1,17 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.15;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {ICustiVaultV1} from "./ICustiVaultV1.sol";
+import {AssetAcceptor} from "./utils/AssetAcceptor.sol";
 
 /// @author Philippe Dumonet <philippe@dumo.net>
-contract CustiVaultV1 is ICustiVaultV1 {
+contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
+    using SafeTransferLib for address;
+
     // [  0..159] owner
     // [160..207] lastPing
     // [208..255] lockedTill
@@ -15,6 +22,8 @@ contract CustiVaultV1 is ICustiVaultV1 {
     uint256 internal constant OWNER_PING_MASK = uint256(type(uint208).max);
     uint256 internal constant NOT_PING_MASK = ~(uint256(type(uint48).max) << 160);
 
+    bytes32 public guardiansTreeRoot;
+
     modifier onlyOwner() {
         uint256 slot0_ = slot0;
         _checkOwner(slot0);
@@ -23,8 +32,13 @@ contract CustiVaultV1 is ICustiVaultV1 {
         _;
     }
 
+    function initialize(address _owner) external {
+        if (slot0 != 0) revert Initialized();
+        _transferOwnership(0, _owner);
+    }
+
     // solhint-disable-next-line no-empty-blocks
-    receive() external payable {}
+    function ping() external payable onlyOwner {}
 
     function lockTill(uint256 _timestamp) external {
         uint256 slot0_ = slot0;
@@ -39,8 +53,13 @@ contract CustiVaultV1 is ICustiVaultV1 {
         slot0 = _setLockTill(slot0_, block.timestamp + _lockDuration);
     }
 
-    // solhint-disable-next-line no-empty-blocks
-    function ping() external payable onlyOwner {}
+    function transferOwnership(address _newOwner) external {
+        if (_newOwner == address(0)) revert NewOwnerZeroAddress();
+        uint256 slot0_ = slot0;
+        _checkOwner(slot0_);
+        _checkLock(slot0_);
+        _transferOwnership(slot0_, _newOwner);
+    }
 
     function doCustomCall(
         address _target,
@@ -51,6 +70,60 @@ contract CustiVaultV1 is ICustiVaultV1 {
         // solhint-disable-next-line avoid-low-level-calls
         (success, returndata) = _target.call{value: _value}(_calldata);
         if (_requireSuccess && !success) revert CustomCallFailed(returndata);
+    }
+
+    function transferNative(address _recipient, uint256 _value) external onlyOwner {
+        if (_value == 0) {
+            _value = address(this).balance;
+            if (_value == 0) return;
+        }
+        _recipient.safeTransferETH(_value);
+    }
+
+    function transferToken(
+        address _token,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner {
+        if (_amount == 0) {
+            _amount = IERC20(_token).balanceOf(address(this));
+            if (_amount == 0) return;
+        }
+        _token.safeTransfer(_to, _amount);
+    }
+
+    function transferTokenFrom(
+        address _token,
+        address _from,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner {
+        if (_amount == 0) {
+            uint256 allowance = IERC20(_token).allowance(_from, address(this));
+            uint256 bal = IERC20(_token).balanceOf(_from);
+            _amount = bal < allowance ? bal : allowance;
+            if (_amount == 0) return;
+        }
+        _token.safeTransferFrom(_from, _to, _amount);
+    }
+
+    function transferNFT(
+        address _token,
+        address _from,
+        address _to,
+        uint256 _tokenId
+    ) external onlyOwner {
+        IERC721(_token).safeTransferFrom(_from, _to, _tokenId);
+    }
+
+    function transferCollectible(
+        address _collectible,
+        address _from,
+        address _to,
+        uint256 _tokenId,
+        uint256 _amount
+    ) external onlyOwner {
+        IERC1155(_collectible).safeTransferFrom(_from, _to, _tokenId, _amount, "");
     }
 
     function ownerPingLockedTill()
@@ -78,6 +151,13 @@ contract CustiVaultV1 is ICustiVaultV1 {
 
     function lockedTill() public view returns (uint256) {
         return slot0 >> LOCKED_TILL_OFFSET;
+    }
+
+    function _transferOwnership(uint256 _slot0, address _newOwner) internal {
+        emit Ping();
+        emit OwnershipTransferred(address(uint160(_slot0)), _newOwner);
+        // solhint-disable-next-line not-rely-on-time
+        slot0 = uint256(uint160(_newOwner)) | (block.timestamp << PING_OFFSET);
     }
 
     function _checkLock(uint256 _slot0) internal view {

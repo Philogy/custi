@@ -30,6 +30,7 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         _checkOwner(slot0);
         _checkLock(slot0);
         emit Ping();
+        // solhint-disable-next-line not-rely-on-time
         slot0 = (slot0_ & NOT_PING_MASK) | (block.timestamp << PING_OFFSET);
         _;
     }
@@ -48,6 +49,7 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
     }
 
     function lockFor(uint256 _lockDuration) external {
+        // solhint-disable-next-line not-rely-on-time
         _lockTill(block.timestamp + _lockDuration);
     }
 
@@ -69,6 +71,7 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         bytes32[] calldata _proof
     ) external {
         bytes32 guardianLeaf;
+        // solhint-disable-next-line no-inline-assembly
         assembly {
             mstore(0x00, caller())
             mstore(0x20, _delay)
@@ -78,9 +81,8 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
             revert InvalidMerkleProof();
         uint256 slot0_ = slot0;
         uint256 lastPing_ = uint48(slot0_ >> PING_OFFSET);
-
+        // solhint-disable-next-line not-rely-on-time
         if (lastPing_ + _delay > block.timestamp) revert DelayNotPassed();
-
         _transferOwnership(slot0_, _newOwner);
     }
 

@@ -26,7 +26,17 @@ are extorted from a victim using the threat of physical violence.
 
 
 ### Functional Requirements V1
--
+**Vault `CustiVaultV1`:**
+1. Only the owner can directly access custody methods (`transfer{...}`, `customCall`)
+2. Only the owner can directly lock the vault
+3. The owner can only ping the vault while not locked
+4. An account is a guardian if contained in the guardian merkle tree along with
+   a delay
+5. A guardian may only change the owner of a vault if their associated delay
+   after the last ping has elapsed.
+6. The owner may only extend the vault's lock while it's still locked
+7. The vault can only be initialized once
+8. The vault owner cannot become the zero-address once initialized
 
 
 **Note:** This repo is _unaudited_, no guarantee about the security of the smart contracts contained in this repo are made.

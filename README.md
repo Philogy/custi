@@ -12,7 +12,8 @@ attacks" in certain scenarios. A "5$ wrench attack" is an attack whereby assets
 are extorted from a victim using the threat of physical violence.
 
 
-## Progress V1 🚧
+## Custi V1
+### V1 Progress 🚧
 
 - [ ] Basic custody: Owner should be able to deposit / withdraw assets from
   their vault
@@ -22,6 +23,10 @@ are extorted from a victim using the threat of physical violence.
   set period of time
 - [ ] Multi-Sig Recovery Agents: Allow easy configuration of recovery options
   that require multiple signatures
+
+
+### Functional Requirements V1
+-
 
 
 **Note:** This repo is _unaudited_, no guarantee about the security of the smart contracts contained in this repo are made.

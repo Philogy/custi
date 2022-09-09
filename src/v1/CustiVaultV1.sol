@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+import {MerkleProofLib} from "solady/utils/MerkleProofLib.sol";
 import {ICustiVaultV1} from "./ICustiVaultV1.sol";
 import {AssetAcceptor} from "./utils/AssetAcceptor.sol";
 
@@ -28,13 +29,15 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         uint256 slot0_ = slot0;
         _checkOwner(slot0);
         _checkLock(slot0);
-        slot0 = _ping(slot0_);
+        emit Ping();
+        slot0 = (slot0_ & NOT_PING_MASK) | (block.timestamp << PING_OFFSET);
         _;
     }
 
-    function initialize(address _owner) external {
+    function initialize(address _owner, bytes32 _guardiansTreeRoot) external {
         if (slot0 != 0) revert Initialized();
         _transferOwnership(0, _owner);
+        _setGuardiansTreeRoot(_guardiansTreeRoot);
     }
 
     // solhint-disable-next-line no-empty-blocks
@@ -58,6 +61,31 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         uint256 slot0_ = slot0;
         _checkOwner(slot0_);
         _checkLock(slot0_);
+        _transferOwnership(slot0_, _newOwner);
+    }
+
+    function setGuardiansTreeRoot(bytes32 _guardiansTreeRoot) external onlyOwner {
+        _setGuardiansTreeRoot(_guardiansTreeRoot);
+    }
+
+    function recoverAsGuardianTo(
+        address _newOwner,
+        uint256 _delay,
+        bytes32[] calldata _proof
+    ) external {
+        bytes32 guardianLeaf;
+        assembly {
+            mstore(0x00, caller())
+            mstore(0x20, _delay)
+            guardianLeaf := keccak256(0x00, 0x40)
+        }
+        if (!MerkleProofLib.verify(_proof, guardiansTreeRoot, guardianLeaf))
+            revert InvalidMerkleProof();
+        uint256 slot0_ = slot0;
+        uint256 lastPing_ = uint48(slot0_ >> PING_OFFSET);
+
+        if (lastPing_ + _delay > block.timestamp) revert DelayNotPassed();
+
         _transferOwnership(slot0_, _newOwner);
     }
 
@@ -191,8 +219,8 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         }
     }
 
-    function _ping(uint256 _slot0) internal returns (uint256 updatedSlot0) {
-        emit Ping();
-        return (_slot0 & NOT_PING_MASK) | (block.timestamp << PING_OFFSET);
+    function _setGuardiansTreeRoot(bytes32 _guardiansTreeRoot) internal {
+        guardiansTreeRoot = _guardiansTreeRoot;
+        emit GuardiansUpdate(_guardiansTreeRoot);
     }
 }

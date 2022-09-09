@@ -8,9 +8,12 @@ interface ICustiVaultV1 {
     error NewOwnerZeroAddress();
     error UseWhileLocked();
     error InvalidLockTime();
+    error InvalidMerkleProof();
+    error DelayNotPassed();
     error CustomCallFailed(bytes errorData);
 
     event Locked(uint256 lockEnd);
     event Ping();
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event GuardiansUpdate(bytes32 indexed guardiansTreeRoot);
 }

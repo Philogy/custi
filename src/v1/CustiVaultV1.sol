@@ -198,7 +198,8 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         uint256 slot0_ = slot0;
         _checkOwner(slot0_);
         uint256 currentLock = slot0_ >> LOCKED_TILL_OFFSET;
-        if (_timestamp <= currentLock) revert InvalidLockTime();
+        // solhint-disable-next-line not-rely-on-time
+        if (_timestamp <= currentLock || _timestamp < block.timestamp) revert InvalidLockTime();
         emit Locked(_timestamp);
         // solhint-disable-next-line not-rely-on-time
         if (currentLock > block.timestamp) {

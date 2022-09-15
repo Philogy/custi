@@ -65,20 +65,34 @@ contract CustiVaultV1 is ICustiVaultV1, AssetAcceptor {
         _setGuardiansTreeRoot(_guardiansTreeRoot);
     }
 
+    function buildGuardianLeaf(address _guardian, uint256 _delay)
+        public
+        pure
+        returns (bytes32 guardianLeaf)
+    {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            mstore(0x00, _guardian)
+            mstore(0x20, _delay)
+            guardianLeaf := keccak256(0x00, 0x40)
+        }
+    }
+
+    function isGuardian(
+        bytes32[] calldata _proof,
+        address _guardian,
+        uint256 _delay
+    ) public view returns (bool) {
+        bytes32 guardianLeaf = buildGuardianLeaf(_guardian, _delay);
+        return MerkleProofLib.verify(_proof, guardiansTreeRoot, guardianLeaf);
+    }
+
     function recoverAsGuardianTo(
         address _newOwner,
         uint256 _delay,
         bytes32[] calldata _proof
     ) external {
-        bytes32 guardianLeaf;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            mstore(0x00, caller())
-            mstore(0x20, _delay)
-            guardianLeaf := keccak256(0x00, 0x40)
-        }
-        if (!MerkleProofLib.verify(_proof, guardiansTreeRoot, guardianLeaf))
-            revert InvalidMerkleProof();
+        if (!isGuardian(_proof, msg.sender, _delay)) revert InvalidMerkleProof();
         uint256 slot0_ = slot0;
         uint256 lastPing_ = uint48(slot0_ >> PING_OFFSET);
         // solhint-disable-next-line not-rely-on-time
